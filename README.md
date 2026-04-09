@@ -20,7 +20,6 @@ LiveMark is a real-time Markdown editor. It gives you a smooth writing workflow 
 - markdown-it-footnote
 - highlight.js
 - DOMPurify
-- lucide-react
 
 ---
 
