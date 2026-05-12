@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const LINE_HEIGHT = 26;
 
@@ -13,8 +13,11 @@ function getCursorPosition(value, selectionStart) {
 
 export function useEditorSync({ content, gutterRef, textareaRef }) {
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
-  const [highlightedLine, setHighlightedLine] = useState(null);
+  const [flashedLine, setFlashedLine] = useState(null);
+  const [trackedLine, setTrackedLine] = useState(null);
   const highlightTimer = useRef(null);
+
+  const lines = useMemo(() => content.split("\n"), [content]);
 
   useEffect(
     () => () => {
@@ -24,6 +27,17 @@ export function useEditorSync({ content, gutterRef, textareaRef }) {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!trackedLine) {
+      return;
+    }
+
+    const currentLineText = lines[trackedLine.line - 1];
+    if (currentLineText !== trackedLine.text) {
+      setTrackedLine(null);
+    }
+  }, [lines, trackedLine]);
 
   const readCursor = () => {
     const textarea = textareaRef.current;
@@ -45,13 +59,13 @@ export function useEditorSync({ content, gutterRef, textareaRef }) {
   };
 
   const flashLine = (lineNumber) => {
-    setHighlightedLine(lineNumber);
+    setFlashedLine(lineNumber);
     if (highlightTimer.current) {
       window.clearTimeout(highlightTimer.current);
     }
 
     highlightTimer.current = window.setTimeout(() => {
-      setHighlightedLine(null);
+      setFlashedLine(null);
     }, 600);
   };
 
@@ -61,10 +75,15 @@ export function useEditorSync({ content, gutterRef, textareaRef }) {
       return;
     }
 
-    const lines = content.split("\n");
     const safeLine = Math.max(1, Math.min(lineNumber, lines.length));
     const charIndex =
       lines.slice(0, safeLine - 1).join("\n").length + (safeLine > 1 ? 1 : 0);
+
+    setTrackedLine({ line: safeLine, text: lines[safeLine - 1] ?? "" });
+    if (highlightTimer.current) {
+      window.clearTimeout(highlightTimer.current);
+      setFlashedLine(null);
+    }
 
     textarea.focus();
     textarea.setSelectionRange(charIndex, charIndex);
@@ -76,11 +95,11 @@ export function useEditorSync({ content, gutterRef, textareaRef }) {
 
   return {
     cursor,
-    highlightedLine,
+    highlightedLine: trackedLine?.line ?? flashedLine,
     flashLine,
     navigateToLine,
     readCursor,
     syncGutterScroll,
-    lineCount: Math.max(1, content.split("\n").length),
+    lineCount: Math.max(1, lines.length),
   };
 }

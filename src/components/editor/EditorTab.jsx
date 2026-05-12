@@ -12,6 +12,7 @@ export default function EditorTab({ content, setContent, onUndo }) {
     typeof window === "undefined" ? true : window.innerWidth >= 768,
   );
   const [mobileView, setMobileView] = useState("edit");
+  const [pendingMobileLine, setPendingMobileLine] = useState(null);
   const [split, setSplit] = useState(50);
   const [dragging, setDragging] = useState(false);
   const html = useMarkdown(content);
@@ -46,8 +47,22 @@ export default function EditorTab({ content, setContent, onUndo }) {
   useEffect(() => {
     if (isDesktop) {
       setMobileView("edit");
+      setPendingMobileLine(null);
     }
   }, [isDesktop]);
+
+  useEffect(() => {
+    if (isDesktop || mobileView !== "edit" || pendingMobileLine == null) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      navigateToLine(pendingMobileLine);
+      setPendingMobileLine(null);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isDesktop, mobileView, navigateToLine, pendingMobileLine]);
 
   useEffect(() => {
     const onPointerMove = (event) => {
@@ -86,6 +101,16 @@ export default function EditorTab({ content, setContent, onUndo }) {
     document.body.style.cursor = "col-resize";
   };
 
+  const handlePreviewNavigate = (lineNumber) => {
+    if (isDesktop) {
+      navigateToLine(lineNumber);
+      return;
+    }
+
+    setPendingMobileLine(lineNumber);
+    setMobileView("edit");
+  };
+
   const desktopLayout = (
     <div
       ref={containerRef}
@@ -116,20 +141,20 @@ export default function EditorTab({ content, setContent, onUndo }) {
         className={`drag-handle h-full w-1 transition-colors ${dragging ? "dragging" : "bg-surface-2 hover:bg-accent"}`}
       />
 
-      <PreviewPanel html={html} onNavigate={navigateToLine} />
+      <PreviewPanel html={html} onNavigate={handlePreviewNavigate} />
     </div>
   );
 
   const mobileLayout = (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex gap-2 border-b border-surface-2 bg-surface-1 px-4 py-2">
+      <div className="flex justify-center gap-2 border-b border-surface-2 bg-surface-1 px-4 py-2">
         <button
           type="button"
           onClick={() => setMobileView("edit")}
           aria-label="Edit"
           className={`inline-flex items-center justify-center px-4 py-2 rounded-2xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 md:h-auto md:w-auto md:px-4 md:py-2 ${mobileView === "edit" ? "bg-accent-light text-accent" : "bg-surface-0 text-ink-secondary hover:bg-surface-2 hover:text-ink"}`}
         >
-          <span className="">✏ Edit</span>
+          <span className="">Edit</span>
         </button>
         <button
           type="button"
@@ -137,7 +162,7 @@ export default function EditorTab({ content, setContent, onUndo }) {
           aria-label="Preview"
           className={`inline-flex items-center justify-center px-4 py-2 rounded-2xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 md:h-auto md:w-auto md:px-4 md:py-2 ${mobileView === "preview" ? "bg-accent-light text-accent" : "bg-surface-0 text-ink-secondary hover:bg-surface-2 hover:text-ink"}`}
         >
-          <span className="">👁 Preview</span>
+          <span className="">Preview</span>
         </button>
       </div>
 
@@ -158,7 +183,7 @@ export default function EditorTab({ content, setContent, onUndo }) {
             textareaRef={textareaRef}
           />
         ) : (
-          <PreviewPanel html={html} onNavigate={navigateToLine} />
+          <PreviewPanel html={html} onNavigate={handlePreviewNavigate} />
         )}
       </div>
     </div>
